@@ -51,7 +51,9 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Main Idea Screen Shots][product-screenshot1][product-screenshot2][product-screenshot3]](https://example.com)
+[![Main Idea Screen Shots][product-screenshot1]]
+[![Main Idea Screen Shots][product-screenshot2]]
+[![Main Idea Screen Shots][product-screenshot3]]
 
 PeerLock is a groundbreaking decentralized access control layer designed specifically for IPFS (InterPlanetary File System) and Filecoin. Unlike traditional access control layers that rely on distributed networks and key sharding, PeerLock introduces a novel approach using Vault Providers (VP) nodes to enhance the security and efficiency of access control.
 
