@@ -13,7 +13,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/othneildrew/Best-README-Template">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
+    <img src="images/logo.jpg" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">PeerLock - Decentralized Key Sharing Layer</h3>
@@ -51,9 +51,9 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Main Idea Screen Shots][product-screenshot1]]
-[![Main Idea Screen Shots][product-screenshot2]]
-[![Main Idea Screen Shots][product-screenshot3]]
+![Main Idea Screen Shots][product-screenshot1]
+![Main Idea Screen Shots][product-screenshot2]
+![Main Idea Screen Shots][product-screenshot3]
 
 PeerLock is a groundbreaking decentralized access control layer designed specifically for IPFS (InterPlanetary File System) and Filecoin. Unlike traditional access control layers that rely on distributed networks and key sharding, PeerLock introduces a novel approach using Vault Providers (VP) nodes to enhance the security and efficiency of access control.
 
