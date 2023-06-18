@@ -177,6 +177,7 @@ Other than this you node will be a VP node.
 - [ ] Secure Connection
 - [ ] More Functions
 - [ ] Efficient API
+- [ ] Condition based Access Control
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
