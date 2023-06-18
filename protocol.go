@@ -23,6 +23,7 @@ const requestVault = "/libp2p/reqvault/1.0.0"
 const responseVault = "/libp2p/resvault/1.0.0"
 const sendData = "/libp2p/senddata/1.0.0"
 const retrieveData = "/libp2p/retrivedata/1.0.0"
+const retriveResponse = "/libp2p/retriveresponse/1.0.0"
 
 // TODO: Replace this handler with a function that handles message from a
 // pubsub Subscribe channel.
@@ -75,7 +76,29 @@ func SendDataR(ctx context.Context, s network.Stream) (string, string, string, s
 	return cm.Contract, cm.CID, cm.Nonce, cm.SignedValue, cm.VaultID, cm.Key, cm.Rec, cm.Permission
 }
 
-func RetrivalRequest(ctx context.Context, s network.Stream) (string, string, string, string) {
+func GotTheKey(ctx context.Context, s network.Stream) (string, string, bool) {
+	// data, err := io.ReadAll(s)
+	// if err != nil {
+	// 	fmt.Fprintln(os.Stderr, err)
+	// }
+	// fmt.Println("Received:", string(data))
+
+	data, err := io.ReadAll(s)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+
+	cm := new(KeyResponse)
+	err = json.Unmarshal(data, cm)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println("Got New Data", cm)
+	return cm.Key, cm.Owner, true
+}
+
+func RetrivalRequest(ctx context.Context, s network.Stream) (string, string, string, string, peer.ID) {
 	// data, err := io.ReadAll(s)
 	// if err != nil {
 	// 	fmt.Fprintln(os.Stderr, err)
@@ -95,7 +118,7 @@ func RetrivalRequest(ctx context.Context, s network.Stream) (string, string, str
 
 	fmt.Println("Got New Retrival Data", data)
 
-	return cm.CID, cm.Nonce, cm.SignedValue, cm.Rec
+	return cm.CID, cm.Nonce, cm.SignedValue, cm.Rec, cm.Peer
 }
 
 func ResponseForVault(ctx context.Context, s network.Stream) (string, error) {

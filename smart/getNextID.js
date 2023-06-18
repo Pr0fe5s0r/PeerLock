@@ -10,17 +10,19 @@ async function GetLastID(con) {
   const provider = new ethers.WebSocketProvider('wss://wss.calibration.node.glif.io/apigw/lotus/rpc/v0');
   //const signer = provider.getSigner();
   var nextcon 
-  if(con != "")
+  if(con != undefined)
   {
     nextcon = con
-  }else if (key.contract != ""){
+  }else if (key.contract != undefined){
     nextcon = key.contract
-  }else if(con == "" && key.contract == "")
+  }
+  
+  if(con == "" && key.contract == "")
   {
     console.log({'"vault_id"':'"'+ '"'}); 
     exit();
   }
-
+  
   const contract2 = new ethers.Contract(nextcon, abi, provider);
 
   // Print the deployed contract address

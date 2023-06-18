@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -115,6 +114,11 @@ type Response struct {
 	SelfID   peer.ID
 }
 
+type KeyResponse struct {
+	Key   string
+	Owner string
+}
+
 type User struct {
 	Address    string `json:"address"`
 	Permission bool   `json:"permission"`
@@ -135,6 +139,7 @@ type SendData struct {
 	VaultID     string
 	Rec         string
 	Permission  bool
+	Peer        peer.ID
 }
 
 type ReturnData struct {
@@ -584,7 +589,7 @@ func main() {
 		// 	fmt.Println(err)
 		// }
 
-		err = updateVPFile(response, "vp.json")
+		err = updateVPFile(response, "vps.json")
 		if err != nil {
 			fmt.Println("Error updating VP file:", err)
 		} else {
@@ -616,32 +621,72 @@ func main() {
 	})
 
 	chost.SetStreamHandler(retrieveData, func(stream network.Stream) {
-		CID, nonce, signedValue, owner := RetrivalRequest(ctx, stream)
+		CID, nonce, signedValue, owner, peerID := RetrivalRequest(ctx, stream)
 
 		addre, err := GetAddressFrom(nonce, signedValue)
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		istrue, err := CheckWalletPermission(CID, addre, owner)
+		istrue, key, err := CheckWalletPermission(CID, addre, owner)
 
 		fmt.Println(istrue)
 		if istrue {
-			fmt.Println(addre, "Is Requsting The Key")
+			if _, err := chost.Peerstore().SupportsProtocols(peerID, retriveResponse); err == nil {
+				ns, err := chost.NewStream(ctx, peerID, retriveResponse)
+				defer func() {
+					if err != nil {
+						fmt.Fprintln(os.Stderr, err)
+					}
+				}()
+
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				var selfAddresses []string
+				addrs := chost.Addrs()
+				for _, addr := range addrs {
+					selfAddresses = append(selfAddresses, addr.String())
+				}
+
+				m := KeyResponse{
+					Key:   key,
+					Owner: owner,
+				}
+
+				msgBytes, err := json.Marshal(m)
+
+				err = chatSend(string(msgBytes), ns)
+			}
 		}
 	})
 
-	chost.SetStreamHandler("/cirrus/1.0.0", func(stream network.Stream) {
+	chost.SetStreamHandler(retriveResponse, func(stream network.Stream) {
 		//fmt.Println("New incoming stream opened")
 		// Read the message from the stream.
-		message, err := bufio.NewReader(stream).ReadString('\n')
+
+		encKey, owbnber, istrue := GotTheKey(ctx, stream)
+
+		fileData, err := ioutil.ReadFile("key.json")
 		if err != nil {
-			fmt.Println("Failed to read message from stream:", err)
-			return
+			fmt.Println("failed to read key.json file: ", err)
 		}
 
-		fmt.Printf("Pinning and Verifying Hash: %s", message)
-		pinIPFSHash(message)
+		keyPair := KeyPair{}
+		err = json.Unmarshal(fileData, &keyPair)
+		if err != nil {
+			fmt.Println("failed to parse key.json file:", err)
+		}
+
+		if istrue {
+			publicKeyBHex := owbnber[2:]
+			originalKey, err := OpenSealedMessage(encKey, publicKeyBHex, keyPair.FVMPrivateKey)
+			if err != nil {
+				fmt.Println("failed to Decrypt the key", err)
+			}
+			fmt.Println("You got the Key", string(originalKey))
+		}
 	})
 
 	//notifee := &discoveryNotifee{h: chost, ctx: ctx}
@@ -687,29 +732,29 @@ func main() {
 
 }
 
-func CheckWalletPermission(cid string, address string, owner string) (bool, error) {
+func CheckWalletPermission(cid string, address string, owner string) (bool, string, error) {
 	data, err := ioutil.ReadFile(owner + ".json")
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
 	var wallets []Vault
 	err = json.Unmarshal(data, &wallets)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
 	for _, wallet := range wallets {
 		if wallet.CID == cid {
 			for _, user := range wallet.Users {
 				if user.Address == address {
-					return user.Permission, nil
+					return user.Permission, user.Key, nil
 				}
 			}
 		}
 	}
 
-	return false, nil
+	return false, "", nil
 }
 
 func GetAddressFromSignature(message string, signature []byte) (common.Address, error) {
@@ -897,7 +942,7 @@ func SendRequestForVault(ctx context.Context, host host.Host) {
 
 func AquireVaultToStore(ctx context.Context, host host.Host) {
 
-	vpdata, err := ioutil.ReadFile("vp.json")
+	vpdata, err := ioutil.ReadFile("vps.json")
 	if err != nil {
 		fmt.Println("failed to read key.json file:", err)
 	}
@@ -970,6 +1015,17 @@ func UploadNewKey(ctx context.Context, host host.Host, signValue string, nonce s
 		fmt.Println("failed to parse JSON: ", err)
 	}
 
+	fileData, err := ioutil.ReadFile("key.json")
+	if err != nil {
+		fmt.Println("failed to read key.json file: %s", err)
+	}
+
+	keyPair := KeyPair{}
+	err = json.Unmarshal(fileData, &keyPair)
+	if err != nil {
+		fmt.Println("failed to parse key.json file: %s", err)
+	}
+
 	for _, resp := range responses {
 		// Convert the string multiaddresses to libp2p multiaddrs
 		peerID, err := peer.IDFromBytes([]byte(resp.SelfID))
@@ -1010,17 +1066,13 @@ func UploadNewKey(ctx context.Context, host host.Host, signValue string, nonce s
 
 			fmt.Println(nonce, signValue)
 
-			m := SendData{
-				SignedValue: signValue,
-				CID:         CID,
-				Contract:    resp.Contract,
-				Key:         key,
-				Nonce:       nonce,
-				VaultID:     resp.ID,
-				Rec:         recipient,
-				Permission:  permission,
-			}
-			msgBytes, err := json.Marshal(m)
+			publicKeyBHex := recipient[2:]
+
+			encryptedmsg, err := SealSecretMessage([]byte(key), publicKeyBHex, keyPair.FVMPrivateKey, signValue, CID, resp.Contract, nonce, resp.ID, permission)
+
+			fmt.Println(encryptedmsg)
+
+			msgBytes, err := json.Marshal(encryptedmsg)
 
 			err = chatSend(string(msgBytes), ns)
 		}
@@ -1035,16 +1087,16 @@ func UploadNewKey(ctx context.Context, host host.Host, signValue string, nonce s
 		// }
 	}
 
-	fileData, err := ioutil.ReadFile("key.json")
-	if err != nil {
-		fmt.Println("failed to read key.json file: %s", err)
-	}
+	// fileData, err := ioutil.ReadFile("key.json")
+	// if err != nil {
+	// 	fmt.Println("failed to read key.json file: %s", err)
+	// }
 
-	keyPair := KeyPair{}
-	err = json.Unmarshal(fileData, &keyPair)
-	if err != nil {
-		fmt.Println("failed to parse key.json file: %s", err)
-	}
+	// keyPair := KeyPair{}
+	// err = json.Unmarshal(fileData, &keyPair)
+	// if err != nil {
+	// 	fmt.Println("failed to parse key.json file: %s", err)
+	// }
 
 	encryptedData, err := EncryptData(peers, CID, keyPair.FVMPublicKey)
 	if err != nil {
@@ -1107,6 +1159,7 @@ func RetriveKey(ctx context.Context, host host.Host, PeerList []string, signValu
 				CID:         CID,
 				Nonce:       nonce,
 				Rec:         owner,
+				Peer:        host.ID(),
 			}
 			msgBytes, err := json.Marshal(m)
 

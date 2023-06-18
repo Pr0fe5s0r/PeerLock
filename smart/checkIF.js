@@ -1,7 +1,7 @@
 const { ethers } = require('ethers');
 const fs = require('fs');
 const { exit, argv } = require('process');
-const key = require("../vp.json")
+const key = require("../vps.json")
 const abi = require("./abi.json")
 
 async function GetOwnerOFVault(con, vaultId) {
